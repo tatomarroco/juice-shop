@@ -1,0 +1,94 @@
+name: OWASP Security Pipeline
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+jobs:
+  sast_bandit:
+    name: SAST - Bandit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Bandit
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit
+
+      - name: Crear carpeta de reportes Bandit
+        run: mkdir -p reports/bandit
+
+      - name: Ejecutar Bandit
+        run: |
+          bandit -r . -f txt -o reports/bandit/bandit-report.txt || true
+
+      - name: Ver archivos generados por Bandit
+        if: always()
+        run: |
+          echo "Contenido de reports:"
+          ls -R reports || true
+
+      - name: Subir reporte Bandit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: reports/bandit
+          if-no-files-found: error
+
+  dependency_check:
+    name: SCA - OWASP Dependency-Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Crear carpeta de reportes Dependency-Check
+        run: mkdir -p reports/dependency-check
+
+      - name: Ejecutar Dependency-Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 'mi-proyecto'
+          path: '.'
+          format: 'HTML'
+          out: 'reports/dependency-check'
+
+      - name: Ver archivos generados por Dependency-Check
+        if: always()
+        run: |
+          echo "Contenido de reports:"
+          ls -R reports || true
+
+      - name: Subir reporte Dependency-Check
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: reports/dependency-check
+          if-no-files-found: error
+
+  zap_baseline:
+    name: DAST - OWASP ZAP Baseline
+    runs-on: ub
